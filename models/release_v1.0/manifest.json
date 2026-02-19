@@ -1,0 +1,13 @@
+{
+  "version": "v1.0",
+  "date": "2026-02-19T00:06:30.269558",
+  "source_run": "distilroberta_finetune_20260218-233208",
+  "components": [
+    "validation_metrics.json",
+    "config.yaml",
+    "model_hf",
+    "Executive_Summary.md",
+    "model.onnx",
+    "manifest.json"
+  ]
+}

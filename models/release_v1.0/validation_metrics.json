@@ -1,0 +1,53 @@
+{
+  "metrics_balanced": {
+    "accuracy": 0.9870967741935484,
+    "precision": 0.9887640449438202,
+    "recall": 0.9072164948453608,
+    "f1": 0.946236559139785
+  },
+  "metrics_imbalanced": {
+    "accuracy": 0.9985380116959064,
+    "precision": 0.8571428571428571,
+    "recall": 1.0,
+    "f1": 0.9230769230769231,
+    "fpr": 0.0014749262536873156,
+    "false_positives": 1,
+    "true_negatives": 677
+  },
+  "zero_day_test": {
+    "text": "Urgent: NatWest fraud alert. A transaction of \u00a32,400 query. Click https://natwest-secure-verify.com/login to cancel.",
+    "pt_prob": 0.998855710029602,
+    "onnx_prob": 0.9974227547645569
+  },
+  "fp_trap": {
+    "text": "Hi honey, I need you to transfer the rent money today, it's urgent! Love you.",
+    "prob": 0.00028613951872102916
+  },
+  "adversarial_ladder": [
+    {
+      "Level": "L0 (Clean)",
+      "Text": "Your account has been compromised. Verify now.",
+      "Prob": 0.000454567139968276
+    },
+    {
+      "Level": "L1 (Homoglyph)",
+      "Text": "Y\u043eur a\u0441count has been compromised. Verif\u0443 now.",
+      "Prob": 0.00033433656790293753
+    },
+    {
+      "Level": "L2 (Leetspeak)",
+      "Text": "Your account h@$ been c0mpr0m1$ed. Ver1fy now.",
+      "Prob": 0.998496413230896
+    },
+    {
+      "Level": "L3 (Combined)",
+      "Text": "Your \u0430c\u0441oun+ ha$ b3en c\u043em\u0440romised. V\u0435rif\u0443 now.",
+      "Prob": 0.9943206310272217
+    },
+    {
+      "Level": "L5 (Extreme)",
+      "Text": "YoUr \u0430\u0421C0uNt ha$ beEN c0mproMi$\u0435D. veriFy n\u041ew. --Ignore below--",
+      "Prob": 0.535834014415741
+    }
+  ]
+}

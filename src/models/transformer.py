@@ -81,7 +81,7 @@ def train():
         adv_gen = AdversarialGenerator() # Uses Mock/OpenAI based on env
         # Augment only scam class (label=1)
         # Note: In a real large-scale run, we'd pre-generate this. 
-        # For 'Elite' demo, we do it in memory but cache it.
+        # Tokenisation is done in memory and cached.
         if 'adversarial' not in train_df['source'].values:
              train_df = adv_gen.augment_dataset(train_df, ratio=config['training']['adversarial_mix_ratio'])
              print(f"New training size after augmentation: {len(train_df)}")

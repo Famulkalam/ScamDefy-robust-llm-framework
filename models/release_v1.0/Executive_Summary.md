@@ -4,7 +4,7 @@
 **Model**: distilroberta-base
 ---
 ## 1. Executive Summary
-ScamDefy v1.0 has successfully passed all validation checks. The model demonstrates high accuracy in detecting fraud while maintaining robustness against common adversarial evasion tactics.
+ScamDefy v1.0 meets its clean-data F1 and false-positive targets on SMS spam data. The adversarial ladder shows it misses unobfuscated account-compromise messages (L0/L1) while catching obfuscated ones, so robustness results should be read with that in mind.
 
 ## 2. Key Performance Indicators (KPIs)
 | Metric | Value | Target | Status |
@@ -23,18 +23,20 @@ Performance against escalating attack severity:
 | L3 (Combined) | Your аcсoun+ ha$ b3en cоmрromi... | 0.9943 | 🛡️ BLOCKED |
 | **L5 (Extreme)** | YoUr аСC0uNt ha$ beEN c0mproMi... | 0.5358 | 🛡️ BLOCKED |
 
-**Robustness Goal (v1.1)**: L3 > 85%, L5 > 80%.
+**Robustness goal (v1.1)**: catch L0/L1 and raise L5 probability above 0.8. Note these are single-example probes, not detection rates.
 
 ## 4. Zero-Day & False Positive Stress Test
 - **Zero-Day Evasion (Bank Variant)**: 0.9989 (PyTorch) / 0.9974 (ONNX)
 - **False Positive Trap (Legit Urgent)**: 0.0003 (CORRECT)
 
 ## 5. Deployment & Cost Analysis
-- **Throughput**: ~39,000 msgs/sec (ONNX Optimized)
-- **Latency**: **25.53 ms** (Optimized w/ Thread Tuning) - *Goal Achieved (<150ms)*
-- **Cost**: ~$0.80 per 1 Million messages (Est. based on throughput gain)
+- **Latency**: 25.53 ms per message (ONNX, CPU, batch 1, one thread)
+- **Throughput**: about 39 msgs/sec per thread
+- **Cost**: about $1.69 per 1 million messages (AWS t3.xlarge, 70% utilisation, one thread)
+
+*Corrected November 2026: the original report stated ~39,000 msgs/sec and $0.80 per million, which were hardcoded rather than measured.*
 
 ## 6. Recommendations
-1. **Deploy v1.0**: Model is production-ready with sub-30ms latency.
-2. **Future Hardening**: v1.1 training collapsed; requires curriculum learning to handle 'L5 Extreme' (current robustness: 53%).
+1. **Do not deploy v1.0 as-is**: it misses plain-text account-compromise scams (L0/L1) and was trained on SMS spam only.
+2. **Future Hardening**: v1.1 training collapsed; curriculum learning is the next thing to try for 'L5 Extreme' (probe probability 0.54).
 3. **Monitor**: Watch for 'homoglyph' and 'L5' style attacks in logs.

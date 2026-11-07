@@ -32,7 +32,7 @@ def generate_executive_report():
     lines.append("---")
     
     lines.append("## 1. Executive Summary")
-    lines.append("ScamDefy v1.0 has successfully passed all validation checks. The model demonstrates high accuracy in detecting fraud while maintaining robustness against common adversarial evasion tactics.")
+    lines.append("ScamDefy v1.0 meets its clean-data F1 and false-positive targets on SMS spam data. The adversarial ladder shows it misses unobfuscated account-compromise messages (L0/L1) while catching obfuscated ones, so robustness results should be read with that in mind.")
     
     lines.append("\n## 2. Key Performance Indicators (KPIs)")
     m = data['metrics_imbalanced']
@@ -60,12 +60,18 @@ def generate_executive_report():
     lines.append(f"- **False Positive Trap (Legit Urgent)**: {data['fp_trap']['prob']:.4f} ({'CORRECT' if data['fp_trap']['prob'] < 0.5 else 'FALSE ALARM'})")
     
     lines.append("\n## 5. Deployment & Cost Analysis")
-    lines.append("- **Throughput**: ~39,000 msgs/sec (ONNX Optimized)")
-    lines.append("- **Latency**: **25.53 ms** (Optimized w/ Thread Tuning) - *Goal Achieved (<150ms)*")
-    lines.append("- **Cost**: ~$0.80 per 1 Million messages (Est. based on throughput gain)")
+    # Throughput and cost are derived from the measured single-thread latency
+    # (previously hardcoded as ~39,000 msgs/sec and $0.80 per million, which
+    # overstated throughput by about 1,000x).
+    latency_ms = data.get("latency_ms", 25.53)
+    throughput = 1000.0 / latency_ms
+    cost_per_million = 0.1664 / (throughput * 0.7 * 3600) * 1_000_000  # see src/deployment/cost_model.py
+    lines.append(f"- **Latency**: {latency_ms:.2f} ms per message (ONNX, CPU, batch 1, one thread)")
+    lines.append(f"- **Throughput**: about {throughput:.0f} msgs/sec per thread")
+    lines.append(f"- **Cost**: about ${cost_per_million:.2f} per 1 million messages (AWS t3.xlarge, 70% utilisation, one thread)")
     
     lines.append("\n## 6. Recommendations")
-    lines.append("1. **Deploy v1.0**: Model is production-ready with sub-30ms latency.")
+    lines.append("1. **Do not deploy v1.0 as-is**: it misses plain-text account-compromise scams (L0/L1) and was trained on SMS spam only.")
     lines.append("2. **Future Hardening**: v1.1 training collapsed; requires curriculum learning to handle 'L5 Extreme' (current robustness: 53%).")
     lines.append("3. **Monitor**: Watch for 'homoglyph' and 'L5' style attacks in logs.")
     

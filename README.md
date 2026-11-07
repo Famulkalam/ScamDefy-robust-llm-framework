@@ -1,127 +1,153 @@
-# 🔥 ScamDefy: Real-Time Adversarial Fraud Detection
+# ScamDefy: Adversarial Robustness Testing for an SMS Scam Classifier
 
-**A production-grade, adversarially hardened LLM framework for real-time APP and phishing fraud detection under deployment constraints.**
+A fine-tuned DistilRoBERTa classifier for scam and spam text messages, with
+an adversarial test battery (homoglyphs, leetspeak, combined obfuscation),
+ONNX export for fast CPU inference, and a calibrated evaluation at a
+realistic 1% scam prevalence.
+
+The aim was to measure how far simple character-level obfuscation can push a
+transformer text classifier, and to report the results honestly, including
+where it fails.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![Status](https://img.shields.io/badge/status-production--ready-green)
 
 ---
 
-## 📊 Business Impact Dashboard
+## Data
 
-**ScamDefy balances robustness, latency, and cost, demonstrating a practical deployment blueprint for financial institutions.**
+- **Training and test data:** the
+  [UCI SMS Spam Collection](https://archive.ics.uci.edu/dataset/228/sms+spam+collection)
+  (5,574 English SMS messages, about 13% spam), deduplicated, with 15% held
+  out for testing and 15% of the rest for validation (stratified).
+- `src/data_engineering/download.py` also has hooks for Enron and phishing
+  email datasets, but in v1.0 these are **3-row placeholders**, so the model
+  is effectively trained on SMS spam only.
+- Spam in this dataset is mostly marketing and prize scams. It is a proxy for
+  authorised push payment (APP) fraud messages, not a sample of them.
 
-| Metric | Value | Business Impact |
-| :--- | :--- | :--- |
-| **Latency** | **25.53 ms** | Ultra-low latency enables **blocking transactions in real-time** without user friction. |
-| **Throughput** | **~39,000 msgs/sec** | Scalable to handle peak banking traffic (CPU-only cost efficiency). |
-| **Cost** | **$0.80 / 1M msgs** | Extremely cost-effective compared to commercial API calls (~$20/1M). |
-| **Accuracy** | **0.946 F1** | High detection rate for standard scams. |
-| **False Positives** | **0.15%** | Only 1.5 false alarms per 1,000 messages (99:1 imbalance). |
+## Results (v1.0)
 
-### 🚀 Why ONNX?
-*   **Eliminates Python overhead**: Runs in optimized C++ runtime.
-*   **Reduces CPU thread contention**: Tuned for single-thread efficiency (`intra_op_num_threads=1`).
-*   **Enables sub-30ms inference**: Validated on commodity hardware (CPU).
-*   **Shadow-Mode Ready**: Lightweight enough to run alongside legacy rules without latency penalty.
+### Standard test set (775 messages, 97 scams)
+
+| Metric | Value |
+| :--- | ---: |
+| Accuracy | 0.987 |
+| Precision | 0.989 |
+| Recall | 0.907 |
+| F1 | 0.946 |
+
+### Simulated 1% scam prevalence (684 messages, 6 scams)
+
+| Metric | Value |
+| :--- | ---: |
+| Recall | 1.000 (6 of 6) |
+| Precision | 0.857 |
+| False positive rate | 0.15% (1 of 678 legitimate messages) |
+
+With only 6 scams in this set, these figures have very wide uncertainty and
+should be read as a sanity check, not a performance claim.
+
+### Adversarial ladder (single-example probes)
+
+Each level applies a stronger obfuscation to the same base message and
+records the model's scam probability (threshold 0.5). These are individual
+probes from `validation_metrics.json`, not detection rates over a test set.
+
+| Level | Attack | Scam probability | Outcome |
+| :--- | :--- | ---: | :--- |
+| L0 | Clean text | 0.0005 | Missed |
+| L1 | Homoglyphs (Cyrillic look-alikes) | 0.0003 | Missed |
+| L2 | Leetspeak | 0.9985 | Caught |
+| L3 | Homoglyphs + leetspeak | 0.9943 | Caught |
+| L5 | Extreme mixed obfuscation | 0.5358 | Caught, only just |
+
+**What this shows:** the model misses the clean account-compromise message
+entirely, most likely because that style of message is rare in SMS spam, and
+it flags obfuscated text largely because the obfuscation itself looks like
+spam. That is a real limitation, and the most useful finding of the project.
+
+### Other probes
+
+- Bank-impersonation phishing text with a fake login link: 0.9989 (PyTorch),
+  0.9974 (ONNX)
+- Legitimate but urgent personal message ("transfer the rent money today"):
+  0.0003, correctly allowed
+
+### Speed
+
+- ONNX Runtime, CPU, batch size 1, one thread: **25.5 ms** per message,
+  so about **39 messages per second per thread**.
+- Using `src/deployment/cost_model.py` (AWS t3.xlarge on-demand, 70%
+  utilisation, one inference thread) that gives roughly **$1.69 per million
+  messages**. Running one worker per vCPU would cut this, but that has not
+  been benchmarked.
+
+## Known limitations
+
+1. Trained and tested on SMS spam, not real bank fraud transcripts.
+2. Misses plain-text account-compromise scams (L0 and L1 above).
+3. The 1% prevalence test has only 6 positive examples.
+4. A v1.1 retraining run with adversarial examples collapsed and was not
+   released.
+5. English only; voice and email channels not evaluated.
+
+## Possible extensions
+
+- Add real phishing and APP-scam corpora in place of the placeholders.
+- Measure detection rates over a full adversarial test set rather than single
+  probes.
+- Curriculum training (easy to hard obfuscation) to close the L5 gap.
+- Batch and multi-worker throughput benchmarks.
 
 ---
 
-## 🛡️ Adversarial Robustness Summary
-
-ScamDefy is hardened against evasion techniques used by sophisticated attackers.
-
-| Level | Attack Type | Example | Detection Rate | Degradation vs L0 |
-| :--- | :--- | :--- | :--- | :--- |
-| **L0** | Clean Text | "Verify your account" | **>99%** | - |
-| **L1** | Homoglyph | "Vеrify yоur accоunt" | **87.3%** | -12% |
-| **L2** | Leetspeak | "V3r1fy y0ur acc0unt" | **>99%** | ~0% |
-| **L3** | Combined | "Vеr1fy y0ur аccоunt" | **99.4%** | ~0% |
-| **L5** | Extreme | "Ki+ch3n S1nk!! http://x.com" | **53.6%** | **-46% (Boundary)** |
-
-### ⚠️ Known Limitations & Boundary
-1.  **L5 "Kitchen Sink" Boundary**: Detection drops to 53.6% under extreme obfuscation, defining the current robustness limit.
-2.  **Dataset Proxy**: Public datasets approximate, but do not replicate, the linguistic nuance of real APP scam transcripts.
-3.  **Scope**: Multilingual fraud and voice-to-text channels are not evaluated in v1.0.
-
----
-
-## 🏗️ System Architecture
+## Architecture
 
 ```mermaid
 graph TD
-    subgraph Training Pipeline
-        A[Public Datasets] --> B(Adversarial Generator);
-        B --> C{DistilRoBERTa};
-        C --> D[Fine-Tuned Model];
-        D --> E[ONNX Export];
+    subgraph Training
+        A[UCI SMS Spam] --> B(Adversarial generator)
+        B --> C{DistilRoBERTa fine-tune}
+        C --> D[Model]
+        D --> E[ONNX export]
     end
 
-    subgraph Inference Pipeline
-        F[Raw Message] --> G(Tokenizer);
-        G --> H(ONNX Runtime);
-        H --> I{Scam Probability};
-        I -- > 0.5 --> J[🚨 BLOCK];
-        I -- < 0.5 --> K[✅ ALLOW];
-        I --> L[Explainability Layer];
+    subgraph Inference
+        F[Message] --> G(Tokenizer)
+        G --> H(ONNX Runtime)
+        H --> I{Scam probability}
+        I -- "> 0.5" --> J[Flag]
+        I -- "< 0.5" --> K[Allow]
+        I --> L[LIME / SHAP explanation]
     end
-    
-    style H fill:#f9f,stroke:#333,stroke-width:2px
-    style J fill:#f00,color:#fff
-    style K fill:#0f0,color:#000
 ```
 
----
+## Running it
 
-## ⚡ One-Click Demo
-
-Experience the speed and accuracy locally:
+The trained weights and the ONNX file are **not** in this repository (they
+exceed GitHub's file limits), so `demo.py` needs them to be rebuilt first:
 
 ```bash
-# 1. Install Dependencies
 pip install -r requirements.txt
 
-# 2. Run Demo
+python -m src.data_engineering.download     # fetch UCI SMS Spam
+python -m src.data_engineering.pipeline     # clean and split
+python -m src.models.transformer            # fine-tune DistilRoBERTa (settings in config/default.yaml)
+python -m src.deployment.export_onnx        # export the trained model to ONNX
+# copy the exported model.onnx (written next to the trained model in the
+# output_dir set in config/default.yaml) into models/release_v1.0/, then:
 python demo.py
 ```
 
-**Output:**
-```text
-Analyzing: 'Urgent: Bank fraud alert. A transaction of £2,400 query...'
-------------------------------
-🛑 Scam Probability: 0.9982
-⚡ Latency:          25.53 ms
-------------------------------
-Result: BLOCKED (Scam Detected) 🛡️
-```
+## Repository structure
 
----
+- `models/release_v1.0/`: frozen configuration, tokenizer, validation
+  metrics and report for v1.0 (model binaries excluded)
+- `src/`: data engineering, adversarial generator, training, evaluation,
+  explainability, deployment and monitoring code
+- `demo.py`: single-message ONNX inference demo
 
-## 🔮 Application to Financial Fraud Defense
+## Author
 
-**ScamDefy serves as a validated prototype demonstrating feasibility; the dissertation will extend this into institution-specific benchmarking and curriculum-based robustness optimization.**
-
-For the **Final Dissertation**, this methodology will be extended by:
-
-1.  **Real-World Benchmarking**: Validating v1.0 against anonymized **real APP scam transcripts** from bank data (replacing synthetic proxies).
-2.  **Dynamic Evolution**: Replacing static "Adversarial Generator" rules with **real fraud evolution patterns** observed in banking logs 2024-2025.
-3.  **Curriculum Learning**: Addressing the **L5 (53%) vulnerability** by implementing a curriculum training schedule (Easy $\to$ Hard samples) to close the robustness gap.
-4.  **Shadow Deployment**: Integrating the ONNX model into a **shadow-mode pipeline** to measure "Silent F1" scores against existing legacy rules.
-5.  **Analyst Alignment**: Tuning the **Explainability Layer (LIME/SHAP)** to output codes compatible with existing fraud analyst workflows (e.g., "Reason Code: 93 - Homoglyph Detected").
-
----
-
-## 📂 Repository Structure
-
-- `models/release_v1.0/`: **Frozen Artifacts** (Config, Report).
-  > **Note**: Large model binaries are excluded from the repository. To regenerate them, run `python -m src.deployment.export_onnx`.
-- `src/`: Source code for Training, Evaluation, and Deployment.
-- `notebooks/`: Exploratory Data Analysis.
-- `demo.py`: Single-script inference demo.
-
----
-
-*Verified by ScamDefy Verification Suite (v1.0)*
-
-**ScamDefy demonstrates that adversarial robustness and real-time deployment are not mutually exclusive — but extreme obfuscation defines a measurable robustness boundary requiring staged learning strategies.**
+Famul Kalam, MSc Business Analytics, University of Edinburgh.
